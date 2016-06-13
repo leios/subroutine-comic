@@ -3,6 +3,7 @@
 * Purpose: We are creating a webcomic with code using cairo.
 *
 *   Notes: This is where we keep main()
+*          Prime numbers of slides have not been implemented
 *-----------------------------------------------------------------------------*/
 
 #include <cairo.h>
@@ -10,16 +11,17 @@
 #include <math.h>
 
 // defining a global variable for the number of panels
-#define num_panel 5
+#define num_panel 5 
 
 // Class to hold all panel data
 class panel{
     public:
-        int box_height, box_width;
+        int box_height, box_width, lw;
         cairo_surface_t *panel_surface[num_panel];
         cairo_t *panel_ctx[num_panel];
         cairo_surface_t *bg_surface;
         cairo_t *bg_ctx;
+        double gap;
 };
 
 // Function to draw initial layout
@@ -31,8 +33,10 @@ void create_scene(panel comic);
 int main (){
 
     panel comic;
-    comic.box_height = 100;
-    comic.box_width  = 100;
+    comic.box_height = 500;
+    comic.box_width  = 500;
+    comic.gap        = 10.0;
+    comic.lw         = 5;
 
     create_scene(comic);
 
@@ -109,16 +113,16 @@ void create_scene(panel comic){
     // Note: When considering box position, we assume a maximum width of 3 boxes
     int surface_width, surface_height;
     if (num_panel == 1){
-        surface_width = comic.box_width;
-        surface_height = comic.box_height;
+        surface_width = comic.box_width + comic.gap;
+        surface_height = comic.box_height + comic.gap;
     }
     else if (num_panel % 2 == 0){
-        surface_width = comic.box_width * 2;
-        surface_height = comic.box_height * (num_panel / 2);
+        surface_width = (comic.box_width + comic.gap) * 2 ;
+        surface_height = (comic.box_height + comic.gap) * (num_panel / 2);
     }
     else{
-        surface_width = comic.box_width * 3;
-        surface_height = comic.box_height * ceil(num_panel / 3.0);
+        surface_width = (comic.box_width + comic.gap) * 3;
+        surface_height = (comic.box_height + comic.gap) * ceil(num_panel / 3.0);
     }
     comic.bg_surface = 
         cairo_image_surface_create(CAIRO_FORMAT_ARGB32, surface_width, 
@@ -135,35 +139,41 @@ void create_scene(panel comic){
 
         // Setting border and source
         cairo_set_source_rgb(comic.panel_ctx[i], 0.0, 0.0, 0.0);
-        cairo_set_line_width(comic.panel_ctx[i], 5);
+        cairo_set_line_width(comic.panel_ctx[i], comic.lw);
     }
 
     // Set the border and source
     cairo_set_source_rgb(comic.bg_ctx, 0.0, 0.0, 0.0);
-    cairo_set_line_width(comic.bg_ctx, 5);
+    cairo_set_line_width(comic.bg_ctx, comic.lw * 2);
 
     // Now we need to draw the boxes
     int tot = 0;
+    double xpos, ypos;
+    
     if (num_panel == 1){
         cairo_rectangle(comic.panel_ctx[0], 0, 0, 
                         comic.box_width, comic.box_height);
 
         // painting bg box to surface
         cairo_stroke(comic.panel_ctx[0]);
-        cairo_set_source_surface(comic.bg_ctx, comic.panel_surface[0],0,0);
+        cairo_set_source_surface(comic.bg_ctx, comic.panel_surface[0], 
+                                 comic.gap, comic.gap);
         cairo_paint(comic.bg_ctx);
     }
     else if (num_panel % 2 == 0){
         tot = 0;
         for (size_t i = 0; i < 2; ++i){
             for (size_t j = 0; j < (size_t)(num_panel / 2); ++j){
+                xpos = i * (comic.box_width + comic.gap / 2) + comic.gap;
+                ypos = j * (comic.box_height + comic.gap / 2) + comic.gap;
+
                 cairo_rectangle(comic.panel_ctx[tot], 0, 0, 
                                 comic.box_width, comic.box_height);
 
                 // painting bg box to surface
                 cairo_stroke(comic.panel_ctx[tot]);
-                cairo_set_source_surface(comic.bg_ctx, comic.panel_surface[tot],                                         i * comic.box_width,
-                                         j * comic.box_height);
+                cairo_set_source_surface(comic.bg_ctx, comic.panel_surface[tot],
+                                         xpos, ypos);
                 cairo_paint(comic.bg_ctx);
 
                 tot += 1;
@@ -178,14 +188,18 @@ void create_scene(panel comic){
                 std::cout << "we are in case 0" << '\n';
                 for (size_t i = 0; i < 3; ++i){
                     for (size_t j = 0; j < ceil(num_panel / 3.0); ++j){
+                        xpos = i * (comic.box_width + comic.gap / 2)
+                               + comic.gap;
+                        ypos = j * (comic.box_height + comic.gap / 2) 
+                               + comic.gap;
+
                         cairo_rectangle(comic.panel_ctx[tot], 0, 0, 
                                         comic.box_width, comic.box_height);
                         // painting bg box to surface
                         cairo_stroke(comic.panel_ctx[tot]);
                         cairo_set_source_surface(comic.bg_ctx, 
                                                  comic.panel_surface[tot],
-                                                 i * comic.box_width,
-                                                 j * comic.box_height);
+                                                 xpos, ypos);
                         cairo_paint(comic.bg_ctx);
                         tot += 1;
                     }
@@ -196,6 +210,10 @@ void create_scene(panel comic){
                 // creating initial rows of 3
                 for (size_t i = 0; i < 3; ++i){
                     for (size_t j = 0; j < ceil(num_panel / 3.0) - 1; ++j){
+                        xpos = i * (comic.box_width + comic.gap / 2)
+                               + comic.gap;
+                        ypos = j * (comic.box_height + comic.gap / 2) 
+                               + comic.gap;
                         cairo_rectangle(comic.panel_ctx[tot], 0, 0, 
                                         comic.box_width, comic.box_height);
 
@@ -203,24 +221,29 @@ void create_scene(panel comic){
                         cairo_stroke(comic.panel_ctx[tot]);
                         cairo_set_source_surface(comic.bg_ctx, 
                                                  comic.panel_surface[tot],
-                                                 i * comic.box_width,
-                                                 j * comic.box_height);
+                                                 xpos, ypos);
                         cairo_paint(comic.bg_ctx);
                         tot += 1;
                     }
                 }
                 // creating final row of 2
-                for (size_t i = 0; i < 2; ++i){
+                for (int i = 0; i < 2; ++i){
+                    xpos = surface_width / 2 + (i-1) * (comic.box_width);
+                    if ((i-1) < 0){
+                        xpos -= comic.gap / 4;
+                    }
+                    else{
+                        xpos += comic.gap / 4;
+                    }
+                    ypos = (ceil(num_panel / 3.0) - 1) * ((comic.box_height 
+                           + comic.gap / 2) + comic.gap);
                     cairo_rectangle(comic.panel_ctx[tot], 0, 0,
                                     comic.box_width, comic.box_height);
                     // painting bg box to surface
                     cairo_stroke(comic.panel_ctx[tot]);
                     cairo_set_source_surface(comic.bg_ctx, 
                                              comic.panel_surface[tot],
-                                             surface_width / 2 + (i-1) * 
-                                                 comic.box_width,
-                                             (ceil(num_panel / 3.0)-1) *
-                                                 comic.box_height);
+                                                 xpos, ypos);
                     cairo_paint(comic.bg_ctx);
                     tot += 1;
                 }
