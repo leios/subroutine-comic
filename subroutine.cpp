@@ -9,9 +9,10 @@
 #include <cairo.h>
 #include <iostream>
 #include <math.h>
+#include <string>
 
 // defining a global variable for the number of panels
-#define num_panel 5 
+#define num_panel 9
 
 // Class to hold all panel data
 class panel{
@@ -22,10 +23,16 @@ class panel{
         cairo_surface_t *bg_surface;
         cairo_t *bg_ctx;
         double gap;
+        double xpos[num_panel], ypos[num_panel];
 };
 
 // Function to draw initial layout
-void create_scene(panel comic);
+void create_scene(panel &comic);
+void write_image(panel comic, std::string pngname);
+void destroy_all(panel &comic);
+
+// Function to draw circle -- FUTURE
+// void draw_circle(panel &comic, double radius, double x, double y);
 
 /*----------------------------------------------------------------------------//
 * MAIN
@@ -33,12 +40,23 @@ void create_scene(panel comic);
 int main (){
 
     panel comic;
-    comic.box_height = 500;
-    comic.box_width  = 500;
+    comic.box_height = 2000;
+    comic.box_width  = 2000;
     comic.gap        = 10.0;
     comic.lw         = 5;
 
     create_scene(comic);
+
+    for (size_t i = 0; i < num_panel; ++i){
+        cairo_move_to (comic.panel_ctx[i], 1000, 1000);
+        cairo_curve_to (comic.panel_ctx[i], 150, 200, 200, 150, 
+                            500, 500);
+        cairo_stroke(comic.panel_ctx[i]);
+    }
+
+    write_image(comic, "subroutine.png");
+
+    destroy_all(comic);
 
     // This is for testing purposes
     /*
@@ -105,7 +123,7 @@ int main (){
 *-----------------------------------------------------------------------------*/
 
 // Function to draw initial layout 
-void create_scene(panel comic){
+void create_scene(panel &comic){
 
     // Create bg surface and context
     // Note: The size of the surface is dependent on the number of boxes
@@ -117,13 +135,17 @@ void create_scene(panel comic){
         surface_height = comic.box_height + comic.gap;
     }
     else if (num_panel % 2 == 0){
-        surface_width = (comic.box_width + comic.gap) * 2 ;
-        surface_height = (comic.box_height + comic.gap) * (num_panel / 2);
+        surface_width = (comic.box_width + comic.gap / 2) * 2 + comic.gap / 2;
+        surface_height = (comic.box_height + comic.gap / 2) * (num_panel / 2)
+                         + comic.gap / 2;
     }
     else{
-        surface_width = (comic.box_width + comic.gap) * 3;
-        surface_height = (comic.box_height + comic.gap) * ceil(num_panel / 3.0);
+        surface_width = (comic.box_width + comic.gap / 2) * 3 + comic.gap / 2;
+        surface_height = (comic.box_height + comic.gap / 2)
+                         * ceil(num_panel / 3.0) + comic.gap / 2;
     }
+
+    // creating background for writing to
     comic.bg_surface = 
         cairo_image_surface_create(CAIRO_FORMAT_ARGB32, surface_width, 
                                    surface_height);
@@ -147,87 +169,95 @@ void create_scene(panel comic){
     cairo_set_line_width(comic.bg_ctx, comic.lw * 2);
 
     // Now we need to draw the boxes
-    int tot = 0;
+
+    // curr is the current box we are drawing
+    int curr = 0;
     double xpos, ypos;
     
+    // For 1 panel
     if (num_panel == 1){
         cairo_rectangle(comic.panel_ctx[0], 0, 0, 
                         comic.box_width, comic.box_height);
 
         // painting bg box to surface
         cairo_stroke(comic.panel_ctx[0]);
-        cairo_set_source_surface(comic.bg_ctx, comic.panel_surface[0], 
-                                 comic.gap, comic.gap);
-        cairo_paint(comic.bg_ctx);
+        comic.xpos[0] = comic.gap / 2;
+        comic.ypos[0] = comic.gap / 2;
     }
+
+    // For even numbers of panlse
     else if (num_panel % 2 == 0){
-        tot = 0;
+        curr = 0;
         for (size_t i = 0; i < 2; ++i){
             for (size_t j = 0; j < (size_t)(num_panel / 2); ++j){
-                xpos = i * (comic.box_width + comic.gap / 2) + comic.gap;
-                ypos = j * (comic.box_height + comic.gap / 2) + comic.gap;
+                xpos = i * (comic.box_width + comic.gap / 2) + (comic.gap / 2);
+                ypos = j * (comic.box_height + comic.gap / 2) + (comic.gap / 2);
 
-                cairo_rectangle(comic.panel_ctx[tot], 0, 0, 
+                cairo_rectangle(comic.panel_ctx[curr], 0, 0, 
                                 comic.box_width, comic.box_height);
 
                 // painting bg box to surface
-                cairo_stroke(comic.panel_ctx[tot]);
-                cairo_set_source_surface(comic.bg_ctx, comic.panel_surface[tot],
-                                         xpos, ypos);
-                cairo_paint(comic.bg_ctx);
-
-                tot += 1;
+                cairo_stroke(comic.panel_ctx[curr]);
+                comic.xpos[curr] = xpos;
+                comic.ypos[curr] = ypos;
+                curr += 1;
             }
         }
 
     }
+
+    // For everything else, (except primes)
     else{
-        tot = 0;
+        curr = 0;
+
+        // Multiples of 3 or not
         switch(num_panel % 3){
+
+            // Multiple of 3
             case 0:
                 std::cout << "we are in case 0" << '\n';
                 for (size_t i = 0; i < 3; ++i){
                     for (size_t j = 0; j < ceil(num_panel / 3.0); ++j){
                         xpos = i * (comic.box_width + comic.gap / 2)
-                               + comic.gap;
+                               + (comic.gap / 2);
                         ypos = j * (comic.box_height + comic.gap / 2) 
-                               + comic.gap;
+                               + (comic.gap / 2);
 
-                        cairo_rectangle(comic.panel_ctx[tot], 0, 0, 
+                        cairo_rectangle(comic.panel_ctx[curr], 0, 0, 
                                         comic.box_width, comic.box_height);
                         // painting bg box to surface
-                        cairo_stroke(comic.panel_ctx[tot]);
-                        cairo_set_source_surface(comic.bg_ctx, 
-                                                 comic.panel_surface[tot],
-                                                 xpos, ypos);
-                        cairo_paint(comic.bg_ctx);
-                        tot += 1;
+                        cairo_stroke(comic.panel_ctx[curr]);
+                        comic.xpos[curr] = xpos;
+                        comic.ypos[curr] = ypos;
+                        curr += 1;
                     }
                 }
                 break;
+
+            // Not multiple of 3
             case 2:
                 std::cout << "we are in case 2" << '\n';
                 // creating initial rows of 3
                 for (size_t i = 0; i < 3; ++i){
                     for (size_t j = 0; j < ceil(num_panel / 3.0) - 1; ++j){
                         xpos = i * (comic.box_width + comic.gap / 2)
-                               + comic.gap;
+                               + (comic.gap / 2);
                         ypos = j * (comic.box_height + comic.gap / 2) 
-                               + comic.gap;
-                        cairo_rectangle(comic.panel_ctx[tot], 0, 0, 
+                               + (comic.gap / 2);
+                        cairo_rectangle(comic.panel_ctx[curr], 0, 0, 
                                         comic.box_width, comic.box_height);
 
                         // painting bg box to surface
-                        cairo_stroke(comic.panel_ctx[tot]);
-                        cairo_set_source_surface(comic.bg_ctx, 
-                                                 comic.panel_surface[tot],
-                                                 xpos, ypos);
-                        cairo_paint(comic.bg_ctx);
-                        tot += 1;
+                        cairo_stroke(comic.panel_ctx[curr]);
+                        comic.xpos[curr] = xpos;
+                        comic.ypos[curr] = ypos;
+                        curr += 1;
                     }
                 }
                 // creating final row of 2
                 for (int i = 0; i < 2; ++i){
+                    // The x and y positions here are defined around the 
+                    // middle of the surface we are drawing to
                     xpos = surface_width / 2 + (i-1) * (comic.box_width);
                     if ((i-1) < 0){
                         xpos -= comic.gap / 4;
@@ -236,27 +266,43 @@ void create_scene(panel comic){
                         xpos += comic.gap / 4;
                     }
                     ypos = (ceil(num_panel / 3.0) - 1) * ((comic.box_height 
-                           + comic.gap / 2) + comic.gap);
-                    cairo_rectangle(comic.panel_ctx[tot], 0, 0,
+                           + comic.gap / 2) + comic.gap / 2);
+                    cairo_rectangle(comic.panel_ctx[curr], 0, 0,
                                     comic.box_width, comic.box_height);
                     // painting bg box to surface
-                    cairo_stroke(comic.panel_ctx[tot]);
-                    cairo_set_source_surface(comic.bg_ctx, 
-                                             comic.panel_surface[tot],
-                                                 xpos, ypos);
-                    cairo_paint(comic.bg_ctx);
-                    tot += 1;
+                    cairo_stroke(comic.panel_ctx[curr]);
+                    comic.xpos[curr] = xpos;
+                    comic.ypos[curr] = ypos;
+                    curr += 1;
                 }
                 break;
+
+            case 1:
+                std::cout << "primes have not been implemented, sorry!" << '\n';
         }
     }
 
-    //cairo_stroke(comic.bg_ctx);
-
     // writing and destroying rendering device
-    cairo_destroy (comic.bg_ctx);
-    cairo_surface_write_to_png (comic.bg_surface, "subroutine.png");
-    cairo_surface_destroy (comic.bg_surface);
+    // write_image(comic, "subroutine.png");
 
 }
 
+// Function to write to png
+void write_image(panel comic, std::string pngname){
+    for (size_t i = 0; i < num_panel; ++i){
+        cairo_set_source_surface(comic.bg_ctx, comic.panel_surface[i],
+                                 comic.xpos[i], comic.ypos[i]);
+        cairo_paint(comic.bg_ctx);
+    }
+    cairo_surface_write_to_png (comic.bg_surface, pngname.c_str());
+}
+
+// Function to destroy all contexts and surfaces
+void destroy_all(panel &comic){
+    for (size_t i = 0; i < num_panel; ++i){
+        cairo_destroy(comic.panel_ctx[i]);
+        cairo_surface_destroy (comic.panel_surface[i]);
+    }
+    cairo_destroy (comic.bg_ctx);
+    cairo_surface_destroy (comic.bg_surface);
+}
