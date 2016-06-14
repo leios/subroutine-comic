@@ -5,8 +5,8 @@ CXXFLAGS = -std=c++11 -g -Wall -march=native -fopenmp -fno-omit-frame-pointer -O
 CAIROFLAGS = `pkg-config --cflags --libs cairo`
 BINS = subroutine
 
-subroutine: subroutine 
-	$(CXX) $(CXXFLAGS) $(CAIROFLAGS) -o subroutine subroutine.cpp
+$(BINS): $(BINS).cpp
+	$(CXX) $(CXXFLAGS) $(CAIROFLAGS) -o $(BINS) $(BINS).cpp
 	./subroutine
 
 clean:

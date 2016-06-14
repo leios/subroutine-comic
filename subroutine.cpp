@@ -12,7 +12,7 @@
 #include <string>
 
 // defining a global variable for the number of panels
-#define num_panel 9
+#define num_panel 5
 
 // Class to hold all panel data
 class panel{
