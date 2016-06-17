@@ -10,9 +10,10 @@
 #include <iostream>
 #include <math.h>
 #include <string>
+#include <vector>
 
 // defining a global variable for the number of panels
-#define num_panel 5
+#define num_panel 1
 
 // Class to hold all panel data
 class panel{
@@ -30,6 +31,14 @@ class panel{
 void create_scene(panel &comic);
 void write_image(panel comic, std::string pngname);
 void destroy_all(panel &comic);
+
+// Function to draw from an array of points
+void draw_array(std::vector<double> &x, std::vector<double> &y, int panel_num,
+                panel &comic);
+
+// Function to find Bezier control points
+void find_bpoints(std::vector<double> &p1, std::vector<double> &p2, 
+                  std::vector<double> &K);
 
 // Function to draw circle -- FUTURE
 // void draw_circle(panel &comic, double radius, double x, double y);
@@ -49,10 +58,22 @@ int main (){
 
     for (size_t i = 0; i < num_panel; ++i){
         cairo_move_to (comic.panel_ctx[i], 1000, 1000);
-        cairo_curve_to (comic.panel_ctx[i], 150, 200, 200, 150, 
-                            500, 500);
+        cairo_curve_to (comic.panel_ctx[i], 150, 200, 150, 200,
+                            500, 0);
         cairo_stroke(comic.panel_ctx[i]);
     }
+
+    // Create a x^2 function and write to image
+    // Note that y is inverted
+    std::vector <double> x(10), y(10);
+    for (size_t i = 0; i < x.size(); i++){
+        x[i] = i * (1000 / x.size());
+        //y[i] = 0.001 * (x[i]) * (x[i]);
+        y[i] = abs((0.001 * (x[i]) * (x[i])) - comic.box_width);
+        std::cout << x[i] << '\t' << y[i] << '\n';
+    }
+
+    draw_array(x, y, 0, comic);
 
     write_image(comic, "subroutine.png");
 
@@ -306,3 +327,85 @@ void destroy_all(panel &comic){
     cairo_destroy (comic.bg_ctx);
     cairo_surface_destroy (comic.bg_surface);
 }
+
+// Function to draw points from an array
+void draw_array(std::vector<double> &x, std::vector<double> &y, int panel_num,
+                panel &comic){
+
+    // Computing control points
+    std::vector<double> p1x(x.size()), p2x(x.size()), 
+                        p1y(x.size()), p2y(x.size());
+    find_bpoints(p1x, p2x, x);
+    find_bpoints(p1y, p2y, y);
+
+    // Move to initial array point
+    cairo_move_to (comic.panel_ctx[panel_num], x[0], y[0]);
+
+    // Drawing the array
+    for (size_t i = 0; i < x.size(); ++i){
+        std::cout << i << '\n';
+        //ypos = abs(y[i] - comic.box_height);
+        cairo_curve_to(comic.panel_ctx[panel_num], p1x[i], p1y[i], 
+                       p2x[i], p2y[i], x[i], y[i]);
+    }
+
+    cairo_stroke(comic.panel_ctx[panel_num]);
+}
+
+// Function to find Bezier control points
+void find_bpoints(std::vector<double> &p1, std::vector<double> &p2, 
+                  std::vector<double> &K){
+
+    int n = K.size();
+    double m;
+
+    std::vector<double> a(n), b(n), c(n), r(n);
+
+    // Adding left-most segments
+    a[0] = 0;
+    b[0] = 2;
+    c[0] = 1;
+    r[0] = K[0] + 2*K[1];
+
+    // Internal segments
+    for (int i = 1; i < n - 1; ++i){
+        a[i] = 1;
+        b[i] = 4;
+        c[i] = 1;
+        r[i] = 4 * K[i] - 2 * K[i+1];
+    }
+
+    // Adding final element
+    a[n - 1] = 2;
+    b[n - 1] = 7;
+    c[n - 1] = 0;
+    r[n - 1] = 8 * K[n-1] + K[n];
+
+    // Thomas algorithm to solve Ax=b
+
+    // Resize p vectors to make sure they work
+    p1.resize(n);
+    p2.resize(n);
+
+    // Computing coefficients
+    for (int i = 1; i < n; ++i){
+        m = a[i] / b[i-1];
+        b[i] = b[i] - m * c[i - 1];
+        r[i] = r[i] = m * r[i - 1];
+    }
+
+    // Computing p1
+    p1[n-1] = r[n - 1] / b[n - 1];
+    for (int i = n - 2; i >= 0; --i){
+        p1[i] = (r[i] - c[i] * p1[i+1]) / b[i];
+    }
+
+    // Now computing p2
+    for (int i = 0; i < n-1; ++i){
+        p2[i] = 2*K[i+1] - p1[i+1];
+    }
+
+    p2[n-1] = 0.5 * (K[n] + p1[n-1]);
+
+}
+
