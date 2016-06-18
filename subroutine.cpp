@@ -66,6 +66,7 @@ int main (){
     // Create a x^2 function and write to image
     // Note that y is inverted
     std::vector <double> x(10), y(10);
+    std::cout << "array points are:" << '\n';
     for (size_t i = 0; i < x.size(); i++){
         x[i] = i * (1000 / x.size());
         //y[i] = 0.001 * (x[i]) * (x[i]);
@@ -74,6 +75,15 @@ int main (){
     }
 
     draw_array(x, y, 0, comic);
+
+/*
+    cairo_move_to(comic.panel_ctx[0],x[0],y[0]);
+    for (size_t i = 0; i < x.size(); ++i){
+        cairo_line_to(comic.panel_ctx[0], x[i], y[i]);
+    }
+*/
+
+    cairo_stroke(comic.panel_ctx[0]);
 
     write_image(comic, "subroutine.png");
 
@@ -342,37 +352,37 @@ void draw_array(std::vector<double> &x, std::vector<double> &y, int panel_num,
     cairo_move_to (comic.panel_ctx[panel_num], x[0], y[0]);
 
     // Drawing the array
-    for (size_t i = 0; i < x.size(); ++i){
-        std::cout << i << '\n';
+    for (size_t i = 0; i < x.size() - 1; ++i){
         //ypos = abs(y[i] - comic.box_height);
         cairo_curve_to(comic.panel_ctx[panel_num], p1x[i], p1y[i], 
-                       p2x[i], p2y[i], x[i], y[i]);
+                       p2x[i], p2y[i], x[i+1], y[i+1]);
     }
 
     cairo_stroke(comic.panel_ctx[panel_num]);
 }
 
-// Function to find Bezier control points
+// Function to find Bezier control points, these are representations of the 
+// slope at the starting and end points
 void find_bpoints(std::vector<double> &p1, std::vector<double> &p2, 
                   std::vector<double> &K){
 
-    int n = K.size();
+    int n = K.size()-1;
     double m;
 
     std::vector<double> a(n), b(n), c(n), r(n);
 
-    // Adding left-most segments
+    // Adding first elements to coefficient vectors
     a[0] = 0;
     b[0] = 2;
     c[0] = 1;
     r[0] = K[0] + 2*K[1];
 
-    // Internal segments
+    // Adding internal elements to coefficient vectors
     for (int i = 1; i < n - 1; ++i){
         a[i] = 1;
         b[i] = 4;
         c[i] = 1;
-        r[i] = 4 * K[i] - 2 * K[i+1];
+        r[i] = 4 * K[i] + 2 * K[i+1];
     }
 
     // Adding final element
@@ -391,7 +401,7 @@ void find_bpoints(std::vector<double> &p1, std::vector<double> &p2,
     for (int i = 1; i < n; ++i){
         m = a[i] / b[i-1];
         b[i] = b[i] - m * c[i - 1];
-        r[i] = r[i] = m * r[i - 1];
+        r[i] = r[i] - m * r[i - 1];
     }
 
     // Computing p1
@@ -406,6 +416,5 @@ void find_bpoints(std::vector<double> &p1, std::vector<double> &p2,
     }
 
     p2[n-1] = 0.5 * (K[n] + p1[n-1]);
-
 }
 
