@@ -33,6 +33,7 @@ void write_image(panel comic, std::string pngname);
 void destroy_all(panel &comic);
 
 // Function to draw from an array of points
+// Drawing without interpolation may eb done on-the-fly
 void draw_array(std::vector<double> &x, std::vector<double> &y, int panel_num,
                 panel &comic);
 
@@ -40,8 +41,8 @@ void draw_array(std::vector<double> &x, std::vector<double> &y, int panel_num,
 void find_bpoints(std::vector<double> &p1, std::vector<double> &p2, 
                   std::vector<double> &K);
 
-// Function to draw circle -- FUTURE
-// void draw_circle(panel &comic, double radius, double x, double y);
+// Function to draw a stick figure
+void stick_figure(double height, double pos_x, double pos_y, cairo_t *ctx);
 
 /*----------------------------------------------------------------------------//
 * MAIN
@@ -56,12 +57,71 @@ int main (){
 
     create_scene(comic);
 
+    std::vector <double> x(5), y(5);
+    x[0] = 0; y[0] = 2000;
+    x[1] = 0; y[1] = 1750;
+    x[2] = 1000; y[2] = 1500;
+    x[3] = 2000; y[3] = 1750;
+    x[4] = 2000; y[4] = 2000;
+
     for (size_t i = 0; i < num_panel; ++i){
-        cairo_move_to (comic.panel_ctx[i], 1000, 1000);
-        cairo_curve_to (comic.panel_ctx[i], 150, 200, 150, 200,
-                            500, 0);
+
+        // Drawing background first
+        cairo_pattern_t *pat
+            = cairo_pattern_create_linear (0.0, 2000,  0.0, 0.0);
+        cairo_pattern_add_color_stop_rgba(pat, 1, .3, .3, 1, 1);
+        cairo_pattern_add_color_stop_rgba(pat, 0, 1, 1, 1, 1);
+        cairo_set_source(comic.panel_ctx[i], pat);
+        cairo_paint(comic.panel_ctx[i]);
+
+        cairo_arc (comic.panel_ctx[i], 0, 0, 300, 2*M_PI, 1.5 * M_PI);
+        cairo_move_to(comic.panel_ctx[i], 10, 10);
+        cairo_set_source_rgb(comic.panel_ctx[i], 1.0, 1.0, 0);
+        cairo_fill_preserve(comic.panel_ctx[i]);
+        cairo_set_source_rgb(comic.panel_ctx[i], 1.0, 0.5, 0);
         cairo_stroke(comic.panel_ctx[i]);
+
+        // create an array to work with
+        draw_array(x, y, i, comic);
+        cairo_move_to(comic.panel_ctx[i], 500, 500);
+        cairo_set_source_rgb(comic.panel_ctx[i], 0, .75, 0);
+        cairo_fill_preserve(comic.panel_ctx[i]);
+        cairo_set_source_rgb(comic.panel_ctx[i], 0,.5, 0);
+        cairo_stroke(comic.panel_ctx[i]);
+        
+        // Draw stick figure
+        stick_figure(500, 1000, 1250, comic.panel_ctx[i]);
+
     }
+
+    // Writing "Hello World!"
+    cairo_set_font_size (comic.panel_ctx[0], 100.0);
+    cairo_set_source_rgb (comic.panel_ctx[0], 1.0, 1.0, 1.0);
+    cairo_move_to (comic.panel_ctx[0], 500, 750);
+    cairo_show_text (comic.panel_ctx[0], "Hello World!");
+
+    // Drawing line from stick figure to words
+    // create array to draw through... because... yeah...
+    std::vector<double> x_line(3), y_line(3);
+    x_line[0] = 900; y_line[0] = 1050;
+    x_line[1] = 800; y_line[1] = 950;
+    x_line[2] = 750; y_line[2] = 800;
+
+    draw_array(x_line, y_line, 0, comic);
+    cairo_stroke(comic.panel_ctx[0]);
+
+    cairo_stroke(comic.panel_ctx[0]);
+
+    write_image(comic, "subroutine.png");
+
+    destroy_all(comic);
+
+
+    /*------------------------------------------------------------------------//
+    * TESTING
+    *-------------------------------------------------------------------------*/
+
+    /*
 
     // Create a x^2 function and write to image
     // Note that y is inverted
@@ -76,21 +136,11 @@ int main (){
 
     draw_array(x, y, 0, comic);
 
-/*
     cairo_move_to(comic.panel_ctx[0],x[0],y[0]);
     for (size_t i = 0; i < x.size(); ++i){
         cairo_line_to(comic.panel_ctx[0], x[i], y[i]);
     }
-*/
 
-    cairo_stroke(comic.panel_ctx[0]);
-
-    write_image(comic, "subroutine.png");
-
-    destroy_all(comic);
-
-    // This is for testing purposes
-    /*
     // Creating initial surface to draw on.
     cairo_surface_t *surface =
         cairo_image_surface_create (CAIRO_FORMAT_ARGB32, 1000, 400);
@@ -358,10 +408,10 @@ void draw_array(std::vector<double> &x, std::vector<double> &y, int panel_num,
                        p2x[i], p2y[i], x[i+1], y[i+1]);
     }
 
-    cairo_stroke(comic.panel_ctx[panel_num]);
+    //cairo_stroke(comic.panel_ctx[panel_num]);
 }
 
-// Function to find Bezier control points, these are representations of the 
+// Function to find Bezier control points, these are ~representations of the 
 // slope at the starting and end points
 void find_bpoints(std::vector<double> &p1, std::vector<double> &p2, 
                   std::vector<double> &K){
@@ -416,5 +466,41 @@ void find_bpoints(std::vector<double> &p1, std::vector<double> &p2,
     }
 
     p2[n-1] = 0.5 * (K[n] + p1[n-1]);
+}
+
+// Function to draw a stick figure
+// Note: position is for the center of stick figure
+void stick_figure(double height, double pos_x, double pos_y, cairo_t *ctx){
+
+    // Draw head
+    double head_y = pos_y - height * 0.333;
+    double head_x = pos_x;
+    double crotch_y = pos_y + 0.16666 * height;
+    cairo_arc(ctx, head_x, head_y, .16666 * height, 0, 2*M_PI);
+
+    // Fill head
+    cairo_move_to(ctx, pos_x, head_y);
+    cairo_set_source_rgb(ctx, 1.0, 1.0, 1.0);
+    cairo_fill_preserve(ctx);
+    cairo_set_source_rgb(ctx, 0, 0, 0);
+    cairo_stroke(ctx);
+
+    // Drawing body
+    cairo_move_to(ctx, pos_x, head_y + 0.16666 * height);
+    cairo_line_to(ctx, pos_x, pos_y + 0.16666 * height);
+
+    // Drawing legs
+    cairo_move_to(ctx, pos_x, crotch_y);
+    cairo_line_to(ctx, pos_x + 0.05 * height, pos_y + 0.5 * height);
+    cairo_move_to(ctx, pos_x, crotch_y);
+    cairo_line_to(ctx, pos_x - 0.05 * height, pos_y + 0.5 * height);
+
+    // Drawing arms
+    cairo_move_to(ctx, pos_x, pos_y - 0.16666 * height);
+    cairo_line_to(ctx, pos_x + 0.05 * height, crotch_y);
+    cairo_move_to(ctx, pos_x, pos_y - 0.16666 * height);
+    cairo_line_to(ctx, pos_x - 0.05 * height, crotch_y);
+
+    cairo_stroke(ctx);
 }
 
